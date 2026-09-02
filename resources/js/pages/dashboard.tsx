@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { CustomVariable } from '../components/CustomVariableBuilder';
+import { SyncEmployeesModal, SyncStatsResult } from '../components/SyncEmployeesModal';
 
 interface LetterTemplateItem {
     id: number;
@@ -62,12 +63,17 @@ interface DashboardProps {
 
 export default function Dashboard({ templates, recentLetters, stats, flash }: DashboardProps) {
     const [searchQuery, setSearchQuery] = useState('');
+    const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
     const [isSyncing, setIsSyncing] = useState(false);
-    const [syncNotification, setSyncNotification] = useState<string | null>(null);
+    const [syncResult, setSyncResult] = useState<SyncStatsResult | null>(null);
+    const [syncError, setSyncError] = useState<string | null>(null);
 
     const handleSyncEmployees = async () => {
         setIsSyncing(true);
-        setSyncNotification(null);
+        setSyncError(null);
+        setSyncResult(null);
+        setIsSyncModalOpen(true);
+
         try {
             const response = await fetch('/employees/sync', {
                 method: 'POST',
@@ -77,18 +83,18 @@ export default function Dashboard({ templates, recentLetters, stats, flash }: Da
                     'X-CSRF-TOKEN':
                         (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
                 },
-                body: JSON.stringify({ pages: 10 }),
+                body: JSON.stringify({}),
             });
 
-            const data = await response.json();
+            const data: SyncStatsResult = await response.json();
             if (data.success) {
-                setSyncNotification(data.message);
+                setSyncResult(data);
                 router.reload({ only: ['stats'] });
             } else {
-                setSyncNotification(`Sync failed: ${data.message}`);
+                setSyncError(data.message || 'Synchronization failed.');
             }
-        } catch (err) {
-            setSyncNotification('Failed to sync employees from external API.');
+        } catch (err: any) {
+            setSyncError(err?.message || 'Failed to sync employees from external API.');
         } finally {
             setIsSyncing(false);
         }
@@ -131,6 +137,14 @@ export default function Dashboard({ templates, recentLetters, stats, flash }: Da
                         <ThemeToggle />
 
                         <Link
+                            href="/employees"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-2xs hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+                        >
+                            <Users className="h-3.5 w-3.5 text-emerald-600" />
+                            <span>Employees</span>
+                        </Link>
+
+                        <Link
                             href="/letters/history"
                             className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 shadow-2xs hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
                         >
@@ -160,23 +174,15 @@ export default function Dashboard({ templates, recentLetters, stats, flash }: Da
                 </div>
             </header>
 
-            {/* Notification Banner */}
-            {syncNotification && (
-                <div className="border-b border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300">
-                    <div className="mx-auto flex max-w-7xl items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                            <span>{syncNotification}</span>
-                        </div>
-                        <button
-                            onClick={() => setSyncNotification(null)}
-                            className="font-medium hover:underline text-xs"
-                        >
-                            Dismiss
-                        </button>
-                    </div>
-                </div>
-            )}
+            {/* Sync Employees Modal */}
+            <SyncEmployeesModal
+                isOpen={isSyncModalOpen}
+                isSyncing={isSyncing}
+                result={syncResult}
+                error={syncError}
+                onClose={() => setIsSyncModalOpen(false)}
+                onStartSync={handleSyncEmployees}
+            />
 
             <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
                 {/* Metric Summary Cards */}
@@ -200,12 +206,15 @@ export default function Dashboard({ templates, recentLetters, stats, flash }: Da
                     </div>
 
                     {/* Employees Stat */}
-                    <div className="rounded-2xl border border-neutral-200/80 bg-white p-5 shadow-2xs transition hover:shadow-md dark:border-neutral-800/80 dark:bg-neutral-900">
+                    <Link
+                        href="/employees"
+                        className="group rounded-2xl border border-neutral-200/80 bg-white p-5 shadow-2xs transition hover:border-emerald-200 hover:shadow-md dark:border-neutral-800/80 dark:bg-neutral-900 dark:hover:border-emerald-900"
+                    >
                         <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 group-hover:text-emerald-600 dark:text-neutral-400 dark:group-hover:text-emerald-400">
                                 Synced Employees
                             </span>
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 transition group-hover:scale-110 dark:bg-emerald-950/60 dark:text-emerald-400">
                                 <Users className="h-4 w-4" />
                             </div>
                         </div>
@@ -213,9 +222,9 @@ export default function Dashboard({ templates, recentLetters, stats, flash }: Da
                             <span className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">
                                 {stats.total_employees}
                             </span>
-                            <span className="text-xs text-emerald-600 dark:text-emerald-400">Live directory</span>
+                            <span className="text-xs text-emerald-600 dark:text-emerald-400">View Directory &rarr;</span>
                         </div>
-                    </div>
+                    </Link>
 
                     {/* Letters Generated Stat */}
                     <div className="rounded-2xl border border-neutral-200/80 bg-white p-5 shadow-2xs transition hover:shadow-md dark:border-neutral-800/80 dark:bg-neutral-900">

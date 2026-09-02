@@ -12,7 +12,7 @@ class SyncEmployeesCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'app:sync-employees {--pages=10 : Maximum pages to sync}';
+    protected $signature = 'app:sync-employees {--pages= : Maximum pages to sync (omit to sync all records via all=1)}';
 
     /**
      * The console command description.
@@ -27,7 +27,7 @@ class SyncEmployeesCommand extends Command
     public function handle(EmployeeSyncService $syncService): int
     {
         $this->info('Starting employee synchronization...');
-        $maxPages = (int) $this->option('pages');
+        $maxPages = $this->option('pages') !== null ? (int) $this->option('pages') : null;
 
         $result = $syncService->sync($maxPages);
 

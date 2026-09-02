@@ -22,7 +22,7 @@ class LetterGeneratorController extends Controller
     public function index(Request $request): Response
     {
         $templates = LetterTemplate::where('is_active', true)->orderBy('title')->get();
-        $employees = Employee::orderBy('name')->limit(100)->get();
+        $employees = Employee::orderBy('name')->get();
 
         $selectedTemplateId = $request->input('template_id');
         $selectedEmployeeId = $request->input('employee_id');
